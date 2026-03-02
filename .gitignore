@@ -1,0 +1,24 @@
+# Environment variables
+.env
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.iws
+.DS_Store
+
+# Compiled files
+target/
+dist/
+node_modules/
+build/
+
+# Logs
+*.log
+logs/
+
+# Docker volumes (if locally stored)
+data/
+volumes/
+

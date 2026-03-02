@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for account-service
+  account-db:
+    image: postgres:16-alpine
+    container_name: luypay-account-db
+    environment:
+      POSTGRES_DB: accountdb
+      POSTGRES_USER: accountuser
+      POSTGRES_PASSWORD: accountpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - account-db-data:/var/lib/postgresql/data
+    networks:
+      - luypay-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accountuser -d accountdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL database for user-service
+  user-db:
+    image: postgres:16-alpine
+    container_name: luypay-user-db
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: useruser
+      POSTGRES_PASSWORD: userpass
+    ports:
+      - "5433:5432"
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    networks:
+      - luypay-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U useruser -d userdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Account Service
+  account-service:
+    build:
+      context: ./account-service
+      dockerfile: Dockerfile
+    container_name: luypay-account-service
+    environment:
+      SPRING_APPLICATION_NAME: account-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://account-db:5432/accountdb
+      SPRING_DATASOURCE_USERNAME: accountuser
+      SPRING_DATASOURCE_PASSWORD: accountpass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      account-db:
+        condition: service_healthy
+    networks:
+      - luypay-network
+    restart: unless-stopped
+
+  # User Service
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: luypay-user-service
+    environment:
+      SPRING_APPLICATION_NAME: user-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/userdb
+      SPRING_DATASOURCE_USERNAME: useruser
+      SPRING_DATASOURCE_PASSWORD: userpass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      SERVER_PORT: 8082
+    ports:
+      - "8082:8082"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - luypay-network
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: luypay-api-gateway
+    environment:
+      SPRING_APPLICATION_NAME: api-gateway
+      SERVER_PORT: 8080
+      # Gateway routes configuration
+      SPRING_CLOUD_GATEWAY_ROUTES_0_ID: account-service
+      SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://account-service:8081
+      SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0: Path=/accounts/**
+      SPRING_CLOUD_GATEWAY_ROUTES_1_ID: user-service
+      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://user-service:8082
+      SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0: Path=/users/**
+    ports:
+      - "8080:8080"
+    depends_on:
+      - account-service
+      - user-service
+    networks:
+      - luypay-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./luypay-frontend
+      dockerfile: Dockerfile
+    container_name: luypay-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - luypay-network
+    restart: unless-stopped
+
+networks:
+  luypay-network:
+    driver: bridge
+
+volumes:
+  account-db-data:
+  user-db-data:
+
