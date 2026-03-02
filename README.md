@@ -136,7 +136,7 @@ docker compose down -v
 ## 🛠️ Alternative: Run Without Docker
 
 ### Prerequisites
-- Java 17 or higher
+- Java 21 or higher
 - Maven 3.9+
 - Node.js 22+
 - PostgreSQL 16
@@ -416,7 +416,7 @@ docker compose logs user-service | grep password
 ## 🛠️ Technologies Used
 
 **Backend:**
-- ☕ Java 17
+- ☕ Java 21
 - 🍃 Spring Boot 4.0.3
 - 🌐 Spring Cloud Gateway
 - 🗃️ Spring Data JPA
