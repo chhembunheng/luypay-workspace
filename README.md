@@ -1,6 +1,16 @@
 # 💳 LuyPay - Microservices Payment Application
 
-A modern, containerized microservices application built with Spring Boot, Angular, and Docker.
+A modern, containerized microservices payment application built with **Spring Boot 4**, **Angular 18**, and **Docker**. Features automated database migrations with **Flyway**, multi-stage Docker builds, and production-ready microservices architecture.
+
+## ⭐ Key Features
+
+- 🎯 **Microservices Architecture** - Modular, scalable service design
+- 🔄 **Automated Database Migrations** - Flyway-managed schema versioning
+- 🐳 **Full Docker Support** - One-command deployment
+- 🔒 **Spring Security** - Built-in authentication & authorization
+- 📊 **PostgreSQL** - Reliable, production-ready data storage
+- 🌐 **API Gateway** - Centralized routing and load balancing
+- ⚡ **Angular 18** - Modern, reactive frontend
 
 ## 🏗️ Architecture
 
@@ -9,12 +19,14 @@ Frontend (Angular/Nginx)
          ↓ Port 80
     API Gateway (Spring Cloud Gateway)
          ↓ Port 8080
-         ├─→ Account Service (Spring Boot) → PostgreSQL (5432)
-         │   Port 8081
+         ├─→ Account Service (Spring Boot) → PostgreSQL (5434)
+         │   Port 8081                         accountdb
          │
          └─→ User Service (Spring Boot) → PostgreSQL (5433)
-             Port 8082
+             Port 8082                       userdb
 ```
+
+**Database Migrations:** Both services use Flyway for automatic schema management on startup.
 
 ## ⚡ TL;DR - Quick Start
 
@@ -30,16 +42,18 @@ docker compose up --build -d
 
 Then visit: **http://localhost**
 
+> ⚠️ **First build takes 5-10 minutes** to download dependencies and build services.
+
 ---
 
 ## 🚀 Quick Start with Docker (Recommended)
 
 ### Prerequisites
-- **Docker** installed and running
-  - **Windows/Mac:** [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-  - **Linux:** Docker Engine + Docker Compose
-- **4GB RAM** available for Docker
-- **Ports available**: 80, 8080, 8081, 8082, 5432, 5433
+- **Docker Desktop** (Windows/Mac) or **Docker Engine** (Linux)
+- **4GB RAM** minimum available for Docker
+- **Free Ports:** 80, 8080, 8081, 8082, 5433, 5434
+
+> 💡 **Tip:** The application uses PostgreSQL 15 for Flyway 11 compatibility with Spring Boot 4.
 
 ### 1. Install Docker
 
@@ -136,27 +150,32 @@ docker compose down -v
 ## 🛠️ Alternative: Run Without Docker
 
 ### Prerequisites
-- Java 21 or higher
-- Maven 3.9+
-- Node.js 22+
-- PostgreSQL 16
-- npm
+- **Java 21** or higher
+- **Maven 3.9+**
+- **Node.js 22+** & npm
+- **PostgreSQL 15** (recommended for Flyway 11 compatibility)
 
 ### 1. Setup Databases
 
-**Account Database:**
+**Create databases and users:**
+
 ```sql
+-- Account Database
 CREATE DATABASE accountdb;
 CREATE USER accountuser WITH PASSWORD 'accountpass';
 GRANT ALL PRIVILEGES ON DATABASE accountdb TO accountuser;
-```
 
-**User Database:**
-```sql
+-- User Database
 CREATE DATABASE userdb;
 CREATE USER useruser WITH PASSWORD 'userpass';
 GRANT ALL PRIVILEGES ON DATABASE userdb TO useruser;
 ```
+
+**Update connection strings (if needed):**
+- Account Service: [account-service/src/main/resources/application.properties](account-service/src/main/resources/application.properties)
+- User Service: [user-service/src/main/resources/application.properties](user-service/src/main/resources/application.properties)
+
+> 📝 **Note:** Flyway will automatically create tables on first startup. No manual schema setup needed.
 
 ### 2. Start Backend Services
 
@@ -232,7 +251,75 @@ luypay-workspace/
 └── README.md                 # This file
 ```
 
-## 🔧 Docker Management
+## � Database Migrations (Flyway)
+
+Database schema is managed automatically using **Flyway**. Migrations run on service startup.
+
+### Migration Files Location
+
+**Account Service:**
+```
+account-service/src/main/resources/db/migration/
+└── V1__Initial_setup.sql
+```
+
+**User Service:**
+```
+user-service/src/main/resources/db/migration/
+└── V1__Create_users_table.sql
+```
+
+### Migration Naming Convention
+
+Flyway requires specific naming:
+```
+V{VERSION}__{DESCRIPTION}.sql
+```
+
+**Examples:**
+- `V1__Initial_setup.sql` - First migration
+- `V2__Add_email_verification.sql` - Second migration
+- `V3__Create_transactions_table.sql` - Third migration
+
+### Adding New Migrations
+
+1. Create new SQL file in `src/main/resources/db/migration/`
+2. Follow naming convention with incremented version
+3. Restart service - Flyway applies new migrations automatically
+
+**Example:**
+```sql
+-- V2__Add_status_column.sql
+ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'ACTIVE';
+```
+
+### Configuration
+
+Flyway is configured in `application.properties`:
+```properties
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+spring.flyway.baseline-on-migrate=true
+```
+
+### Dependencies
+
+Both services use:
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-flyway</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.flywaydb</groupId>
+    <artifactId>flyway-database-postgresql</artifactId>
+    <scope>runtime</scope>
+</dependency>
+```
+
+> 📚 **Learn more:** [FLYWAY_MIGRATION_SETUP.md](FLYWAY_MIGRATION_SETUP.md)
+
+## �🔧 Docker Management
 
 ### Windows - PowerShell Script
 
@@ -343,7 +430,7 @@ docker-compose up --build account-service
 
 ### Account Database
 - **Host:** localhost
-- **Port:** 5432
+- **Port:** 5434
 - **Database:** accountdb
 - **Username:** accountuser
 - **Password:** accountpass
@@ -355,13 +442,30 @@ docker-compose up --build account-service
 - **Username:** useruser
 - **Password:** userpass
 
-**Connect using:**
-```powershell
+**Connect using psql:**
+```bash
 # Account DB
-psql -h localhost -p 5432 -U accountuser -d accountdb
+psql -h localhost -p 5434 -U accountuser -d accountdb
 
 # User DB
 psql -h localhost -p 5433 -U useruser -d userdb
+```
+
+**Or using Docker:**
+```bash
+# Account DB
+docker exec -it luypay-account-db psql -U accountuser -d accountdb
+
+# User DB
+docker exec -it luypay-user-db psql -U useruser -d userdb
+```
+
+### View Migration Status
+
+Check Flyway migration history:
+```sql
+-- Shows all applied migrations
+SELECT * FROM flyway_schema_history;
 ```
 
 ## 🧪 API Endpoints
@@ -416,24 +520,25 @@ docker compose logs user-service | grep password
 ## 🛠️ Technologies Used
 
 **Backend:**
-- ☕ Java 21
-- 🍃 Spring Boot 4.0.3
-- 🌐 Spring Cloud Gateway
-- 🗃️ Spring Data JPA
-- 🐘 PostgreSQL 16
-- 🔒 Spring Security
-- 📦 Maven
+- ☕ **Java 21** - Modern LTS Java version
+- 🍃 **Spring Boot 4.0.3** - Latest Spring framework
+- 🌐 **Spring Cloud Gateway** - API gateway & routing
+- 🗃️ **Spring Data JPA** - Database abstraction with Hibernate 7
+- 🔄 **Flyway 11** - Database migration management
+- 🐘 **PostgreSQL 15** - Reliable relational database
+- 🔒 **Spring Security** - Authentication & authorization
+- 📦 **Maven 3.9** - Dependency management
 
 **Frontend:**
-- 🅰️ Angular 18+
-- 📘 TypeScript
-- 🎨 SCSS
-- 🌐 Nginx
+- 🅰️ **Angular 18** - Modern TypeScript framework
+- 📘 **TypeScript 5** - Type-safe JavaScript
+- 🎨 **SCSS** - Enhanced CSS styling
+- 🌐 **Nginx** - Production web server
 
 **DevOps:**
-- 🐳 Docker
-- 🐙 Docker Compose
-- 🔧 Multi-stage Builds
+- 🐳 **Docker 24+** - Containerization
+- 🐙 **Docker Compose** - Multi-container orchestration
+- 🔧 **Multi-stage Builds** - Optimized container images
 
 ## 🐛 Troubleshooting
 
@@ -443,14 +548,14 @@ docker compose logs user-service | grep password
 
 **Windows:**
 ```powershell
-netstat -ano | findstr "80 8080 8081 8082 5432 5433"
+netstat -ano | findstr "80 8080 8081 8082 5433 5434"
 ```
 
 **Linux / macOS:**
 ```bash
-sudo lsof -i :80,8080,8081,8082,5432,5433
+sudo lsof -i :80,8080,8081,8082,5433,5434
 # or
-sudo netstat -tulpn | grep -E "80|8080|8081|8082|5432|5433"
+sudo netstat -tulpn | grep -E "80|8080|8081|8082|5433|5434"
 ```
 
 #### Check Docker is running
@@ -458,6 +563,41 @@ sudo netstat -tulpn | grep -E "80|8080|8081|8082|5432|5433"
 # Works on all platforms
 docker --version
 docker compose version
+```
+
+### Migration Issues
+
+#### Flyway migration fails
+
+**Symptom:** Service crashes with `Unsupported Database: PostgreSQL X.X`
+
+**Solution:**
+- Ensure PostgreSQL 15 is used (defined in [docker-compose.yml](docker-compose.yml))
+- Flyway 11 Community Edition (included with Spring Boot 4) supports PostgreSQL up to version 15
+
+**Check migration status:**
+```bash
+# View service logs for Flyway output
+docker logs luypay-user-service | grep -i flyway
+docker logs luypay-account-service | grep -i flyway
+
+# Connect to database and check migration history
+docker exec -it luypay-user-db psql -U useruser -d userdb -c "SELECT * FROM flyway_schema_history;"
+```
+
+#### Reset database and re-run migrations
+
+**⚠️ Warning: This deletes all data**
+
+```bash
+# Stop services
+docker-compose down
+
+# Remove database volumes
+docker volume rm luypay-workspace_user-db-data luypay-workspace_account-db-data
+
+# Restart - Flyway will recreate schema
+docker-compose up -d
 ```
 
 ### Clean Restart
@@ -511,12 +651,6 @@ Docker uses system memory directly. Ensure at least 4GB available:
 free -h
 ```
 
-## 📚 Additional Documentation
-
-- [DOCKER_README.md](DOCKER_README.md) - Detailed Docker guide
-- [START_HERE.md](START_HERE.md) - Getting started guide
-- [SUMMARY.md](SUMMARY.md) - Project summary
-
 ## 🚀 Development Workflow
 
 ### Running in Development Mode
@@ -560,18 +694,24 @@ Frontend will be available at: http://localhost:4200
 
 This project is for educational purposes.
 
-## 👥 Authors
+## 👥 Author
 
-- **Chhem Bunheng** - [GitHub](https://github.com/chhembunheng)
+**Chhem Bunheng** - [GitHub](https://github.com/chhembunheng)
 
 ## 🙏 Acknowledgments
 
-- Spring Boot Team
+- Spring Boot & Spring Cloud Teams
+- Flyway by Redgate
 - Angular Team
-- Docker Community
+- Docker & PostgreSQL Communities
 
 ---
 
-**Repository:** https://github.com/chhembunheng/luypay-workspace
+## 📌 Important Notes
 
-For detailed Docker instructions, see [DOCKER_README.md](DOCKER_README.md)
+- ✅ **Flyway automatically creates tables** - No manual schema setup needed
+- ✅ **PostgreSQL 15** is used for Flyway 11 compatibility with Spring Boot 4
+- ✅ **Database migrations** run automatically on service startup
+- ✅ **Spring Security** is enabled on User Service (check logs for password)
+
+**Repository:** https://github.com/chhembunheng/luypay-workspace
